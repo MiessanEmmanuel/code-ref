@@ -1,0 +1,70 @@
+name: Sound Submission Review
+
+on:
+  issues:
+    types: [opened, reopened]
+
+jobs:
+  process-submission:
+    if: contains(github.event.issue.labels.*.name, 'sound-submission')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Extract attachment URL
+        id: extract
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body || '';
+            const urlMatch = body.match(/https:\/\/github\.com\/[^\s\)\"]+\.(mp3|wav|ogg|mp4|mov|avi|mkv|webm|m4v)/i);
+            const url = urlMatch ? urlMatch[0] : null;
+
+            const nameMatch = body.match(/### Sound name\s*\n+([^\n]+)/);
+            const name = nameMatch ? nameMatch[1].trim() : 'Unknown';
+
+            const tagsMatch = body.match(/### Tags\s*\n+([^\n]+)/);
+            const tags = tagsMatch ? tagsMatch[1].trim() : '';
+
+            core.setOutput('url', url || '');
+            core.setOutput('name', name);
+            core.setOutput('tags', tags);
+            core.setOutput('author', context.payload.issue.user.login);
+            core.setOutput('issue_number', context.payload.issue.number);
+
+      - name: Post review comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = '${{ steps.extract.outputs.url }}';
+            const name = '${{ steps.extract.outputs.name }}';
+            const author = '${{ steps.extract.outputs.author }}';
+
+            let body = '';
+
+            if (!url) {
+              body = `⚠️ **No audio/video file detected in this submission.**\n\nPlease edit the issue and attach a \`.mp3\`, \`.wav\`, or video file.\n\n_This check ran automatically._`;
+            } else {
+              body = [
+                `🎵 **New sound submission ready for review!**`,
+                ``,
+                `| Field | Value |`,
+                `|---|---|`,
+                `| **Name** | ${name} |`,
+                `| **Author** | @${author} |`,
+                `| **File** | [Download & listen](${url}) |`,
+                ``,
+                `**To approve:** comment \`/approve\``,
+                `**To reject:** comment \`/reject <optional reason>\``,
+                ``,
+                `_This check ran automatically._`
+              ].join('\n');
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body
+            });

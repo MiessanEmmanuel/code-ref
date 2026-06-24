@@ -3,10 +3,11 @@
   "displayName": "Code Ref",
   "description": "Plays a random sound when a new bug appears in your code",
   "version": "0.1.0",
-  "publisher": "code-ref",
+  "publisher": "opencode0",
   "engines": {
     "vscode": "^1.85.0"
   },
+  "icon": "icon.png",
   "categories": ["Other"],
   "keywords": ["sound", "bug", "diagnostic", "fun"],
   "activationEvents": ["onStartupFinished"],

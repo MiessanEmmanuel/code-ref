@@ -1,0 +1,173 @@
+name: Sound Approve / Reject
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  handle-command:
+    if: |
+      contains(github.event.issue.labels.*.name, 'sound-submission') &&
+      (startsWith(github.event.comment.body, '/approve') || startsWith(github.event.comment.body, '/reject')) &&
+      github.event.comment.user.login == github.repository_owner
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Parse command
+        id: cmd
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const comment = context.payload.comment.body.trim();
+            const isApprove = comment.startsWith('/approve');
+            const rejectReason = comment.replace('/reject', '').trim();
+
+            const issueBody = context.payload.issue.body || '';
+
+            const urlMatch = issueBody.match(/https:\/\/github\.com\/[^\s\)\"]+\.(mp3|wav|ogg|mp4|mov|avi|mkv|webm|m4v)/i);
+            const url = urlMatch ? urlMatch[0] : null;
+
+            const nameMatch = issueBody.match(/### Sound name\s*\n+([^\n]+)/);
+            const name = nameMatch ? nameMatch[1].trim() : 'Unknown';
+
+            const tagsMatch = issueBody.match(/### Tags\s*\n+([^\n]+)/);
+            const rawTags = tagsMatch ? tagsMatch[1].trim() : '';
+            const tags = rawTags ? rawTags.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+            const author = context.payload.issue.user.login;
+
+            core.setOutput('approve', isApprove ? 'true' : 'false');
+            core.setOutput('reject_reason', rejectReason);
+            core.setOutput('url', url || '');
+            core.setOutput('name', name);
+            core.setOutput('tags', JSON.stringify(tags));
+            core.setOutput('author', author);
+            core.setOutput('issue_number', context.payload.issue.number);
+
+      - name: Download and convert sound
+        if: steps.cmd.outputs.approve == 'true' && steps.cmd.outputs.url != ''
+        id: download
+        run: |
+          URL="${{ steps.cmd.outputs.url }}"
+          EXT="${URL##*.}"
+          EXT_LOWER=$(echo "$EXT" | tr '[:upper:]' '[:lower:]')
+          ISSUE="${{ steps.cmd.outputs.issue_number }}"
+
+          # Sanitize name for filename
+          NAME="${{ steps.cmd.outputs.name }}"
+          SAFE_NAME=$(echo "$NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
+
+          mkdir -p community/sounds
+
+          curl -L -o "community/sounds/tmp_${ISSUE}.${EXT_LOWER}" "$URL"
+
+          VIDEO_EXTS="mp4 mov avi mkv webm m4v flv wmv"
+          OUTPUT_FILE="community/sounds/${SAFE_NAME}-${ISSUE}.mp3"
+
+          if echo "$VIDEO_EXTS" | grep -w "$EXT_LOWER" > /dev/null; then
+            ffmpeg -y -i "community/sounds/tmp_${ISSUE}.${EXT_LOWER}" -t 17 -vn -ar 44100 -ac 2 -b:a 192k "$OUTPUT_FILE"
+            rm "community/sounds/tmp_${ISSUE}.${EXT_LOWER}"
+          else
+            mv "community/sounds/tmp_${ISSUE}.${EXT_LOWER}" "$OUTPUT_FILE"
+          fi
+
+          echo "output_file=${OUTPUT_FILE}" >> $GITHUB_OUTPUT
+          echo "file_name=$(basename $OUTPUT_FILE)" >> $GITHUB_OUTPUT
+
+      - name: Update manifest.json
+        if: steps.cmd.outputs.approve == 'true' && steps.cmd.outputs.url != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const manifestPath = 'community/manifest.json';
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+
+            const fileName = '${{ steps.download.outputs.file_name }}';
+            const issueNumber = '${{ steps.cmd.outputs.issue_number }}';
+            const name = '${{ steps.cmd.outputs.name }}';
+            const author = '${{ steps.cmd.outputs.author }}';
+            const tags = JSON.parse('${{ steps.cmd.outputs.tags }}');
+
+            const newSound = {
+              id: `sound-${issueNumber}`,
+              name,
+              file: fileName,
+              url: `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/main/community/sounds/${fileName}`,
+              author,
+              tags,
+              duration: 17
+            };
+
+            manifest.sounds.push(newSound);
+            fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+            core.setOutput('sound_name', name);
+
+      - name: Commit approved sound
+        if: steps.cmd.outputs.approve == 'true' && steps.cmd.outputs.url != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add community/
+          git commit -m "Add community sound: ${{ steps.cmd.outputs.name }} (issue #${{ steps.cmd.outputs.issue_number }})"
+          git push
+
+      - name: Comment and close issue (approve)
+        if: steps.cmd.outputs.approve == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const hasFile = '${{ steps.cmd.outputs.url }}' !== '';
+            const body = hasFile
+              ? `✅ **Sound approved and added to the community library!**\n\nIt will be available to all Code Ref users immediately.\n\nThank you @${{ steps.cmd.outputs.author }}! 🎵`
+              : `✅ Approved — but no file was found in the submission. Please re-open and attach the sound file.`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.cmd.outputs.issue_number }},
+              body
+            });
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.cmd.outputs.issue_number }},
+              state: 'closed',
+              labels: ['sound-submission', 'approved']
+            });
+
+      - name: Comment and close issue (reject)
+        if: steps.cmd.outputs.approve == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const reason = '${{ steps.cmd.outputs.reject_reason }}';
+            const body = reason
+              ? `❌ **Sound rejected.**\n\nReason: ${reason}\n\nFeel free to submit another sound!`
+              : `❌ **Sound rejected.**\n\nFeel free to submit another sound!`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.cmd.outputs.issue_number }},
+              body
+            });
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.cmd.outputs.issue_number }},
+              state: 'closed',
+              labels: ['sound-submission', 'rejected']
+            });
