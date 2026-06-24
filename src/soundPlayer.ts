@@ -52,17 +52,23 @@ export class SoundPlayer {
     const platform = process.platform;
 
     if (platform === "darwin") {
-      // afplay supports -v for volume (0.0–255, 1.0 = normal)
       execFile("afplay", ["-v", String(volume), filePath], () => {});
     } else if (platform === "win32") {
-      const script = `
-        $player = New-Object System.Media.SoundPlayer;
-        $player.SoundLocation = '${filePath}';
-        $player.PlaySync();
-      `;
-      execFile("powershell", ["-Command", script], () => {});
+      // Pass path as a separate argument to avoid PowerShell injection
+      execFile(
+        "powershell",
+        [
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          "[System.Reflection.Assembly]::LoadWithPartialName('System.Media') | Out-Null; " +
+          "$p = New-Object System.Media.SoundPlayer($args[0]); $p.PlaySync()",
+          "--",
+          filePath,
+        ],
+        () => {}
+      );
     } else {
-      // Linux: try paplay, fallback to aplay
       execFile("paplay", [filePath], (err) => {
         if (err) execFile("aplay", [filePath], () => {});
       });
@@ -110,7 +116,8 @@ export class SoundPlayer {
   }
 
   removeSound(fileName: string): void {
-    const filePath = path.join(this.soundsDir, fileName);
+    const safe = path.basename(fileName);
+    const filePath = path.join(this.soundsDir, safe);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   }
 }

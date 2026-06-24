@@ -52,8 +52,22 @@ export class CommunityFetcher {
     });
   }
 
+  private assertTrustedUrl(url: string): void {
+    const allowed = /^https:\/\/raw\.githubusercontent\.com\/MiessanEmmanuel\//;
+    if (!allowed.test(url)) {
+      throw new Error(`Untrusted download URL blocked: ${url}`);
+    }
+  }
+
   downloadSound(sound: CommunitySound): Promise<string> {
-    const dest = path.join(this.cacheDir, sound.file);
+    this.assertTrustedUrl(sound.url);
+
+    const safeFile = path.basename(sound.file);
+    if (!/\.(mp3|wav)$/i.test(safeFile)) {
+      return Promise.reject(new Error(`Invalid file type: ${safeFile}`));
+    }
+
+    const dest = path.join(this.cacheDir, safeFile);
     if (fs.existsSync(dest)) return Promise.resolve(dest);
 
     return new Promise((resolve, reject) => {
