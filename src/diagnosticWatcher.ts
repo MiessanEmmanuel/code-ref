@@ -12,7 +12,7 @@ export class DiagnosticWatcher {
   }
 
   private handleChange(uris: readonly vscode.Uri[]): void {
-    const config = vscode.workspace.getConfiguration("soundIvory");
+    const config = vscode.workspace.getConfiguration("codeRef");
     if (!config.get<boolean>("enabled", true)) return;
 
     const triggerOn = config.get<string[]>("triggerOn", ["error"]);

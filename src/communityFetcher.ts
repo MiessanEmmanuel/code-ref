@@ -18,7 +18,7 @@ export interface CommunityManifest {
 }
 
 const MANIFEST_URL =
-  "https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/sound-ivory/main/community/manifest.json";
+  "https://raw.githubusercontent.com/MiessanEmmanuel/sound-ivory/main/community/manifest.json";
 
 export class CommunityFetcher {
   private cacheDir: string;

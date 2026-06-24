@@ -4,7 +4,7 @@ import { SoundPlayer } from "./soundPlayer";
 import { CommunityFetcher, CommunityManifest, CommunitySound } from "./communityFetcher";
 
 const GITHUB_ISSUE_URL =
-  "https://github.com/YOUR_GITHUB_USERNAME/sound-ivory/issues/new?template=sound-submission.yml";
+  "https://github.com/MiessanEmmanuel/sound-ivory/issues/new?template=sound-submission.yml";
 
 export class AdminPanel {
   private panel: vscode.WebviewPanel | undefined;
@@ -25,8 +25,8 @@ export class AdminPanel {
     }
 
     this.panel = vscode.window.createWebviewPanel(
-      "soundIvoryAdmin",
-      "Sound Ivory",
+      "codeRefAdmin",
+      "Code Ref",
       vscode.ViewColumn.One,
       { enableScripts: true, retainContextWhenHidden: true }
     );
@@ -47,7 +47,7 @@ export class AdminPanel {
           });
           if (uris && uris.length > 0) {
             await vscode.window.withProgress(
-              { location: vscode.ProgressLocation.Notification, title: "Sound Ivory: Processing…", cancellable: false },
+              { location: vscode.ProgressLocation.Notification, title: "Code Ref: Processing…", cancellable: false },
               async (progress) => {
                 for (let i = 0; i < uris.length; i++) {
                   const uri = uris[i];
@@ -57,7 +57,7 @@ export class AdminPanel {
                     await this.player.addSound(uri.fsPath);
                   } catch (e: unknown) {
                     vscode.window.showErrorMessage(
-                      `Sound Ivory: Failed to process "${name}": ${e instanceof Error ? e.message : String(e)}`
+                      `Code Ref: Failed to process "${name}": ${e instanceof Error ? e.message : String(e)}`
                     );
                   }
                 }
@@ -74,7 +74,7 @@ export class AdminPanel {
           break;
 
         case "previewMySound": {
-          const config = vscode.workspace.getConfiguration("soundIvory");
+          const config = vscode.workspace.getConfiguration("codeRef");
           const filePath = path.join(this.context.globalStorageUri.fsPath, "sounds", msg.fileName);
           this.player.playFile(filePath, config.get<number>("volume", 0.8));
           break;
@@ -105,7 +105,7 @@ export class AdminPanel {
           break;
 
         case "previewCommunitySound": {
-          const config = vscode.workspace.getConfiguration("soundIvory");
+          const config = vscode.workspace.getConfiguration("codeRef");
           const filePath = path.join(this.context.globalStorageUri.fsPath, "community", msg.fileName);
           this.player.playFile(filePath, config.get<number>("volume", 0.8));
           break;
@@ -158,7 +158,7 @@ export class AdminPanel {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sound Ivory</title>
+<title>Code Ref</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 0; margin: 0; }
@@ -203,7 +203,7 @@ export class AdminPanel {
 </head>
 <body>
 <header>
-  <h1>🔊 Sound Ivory</h1>
+  <h1>🔊 Code Ref</h1>
   <div class="tabs">
     <button class="tab ${activeTab === "my" ? "active" : ""}" onclick="switchTab('my')">My Sounds</button>
     <button class="tab ${activeTab === "community" ? "active" : ""}" onclick="switchTab('community')">Community</button>

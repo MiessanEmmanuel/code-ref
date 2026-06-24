@@ -1,9 +1,9 @@
 {
-  "name": "sound-ivory",
-  "displayName": "Sound Ivory",
+  "name": "code-ref",
+  "displayName": "Code Ref",
   "description": "Plays a random sound when a new bug appears in your code",
   "version": "0.1.0",
-  "publisher": "sound-ivory",
+  "publisher": "code-ref",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -14,35 +14,35 @@
   "contributes": {
     "commands": [
       {
-        "command": "soundIvory.manageSounds",
-        "title": "Sound Ivory: Manage Sounds"
+        "command": "codeRef.manageSounds",
+        "title": "Code Ref: Manage Sounds"
       },
       {
-        "command": "soundIvory.toggle",
-        "title": "Sound Ivory: Toggle On/Off"
+        "command": "codeRef.toggle",
+        "title": "Code Ref: Toggle On/Off"
       }
     ],
     "configuration": {
-      "title": "Sound Ivory",
+      "title": "Code Ref",
       "properties": {
-        "soundIvory.enabled": {
+        "codeRef.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Enable or disable sound alerts"
         },
-        "soundIvory.volume": {
+        "codeRef.volume": {
           "type": "number",
           "default": 0.8,
           "minimum": 0,
           "maximum": 1,
           "description": "Playback volume (0.0 to 1.0)"
         },
-        "soundIvory.cooldownMs": {
+        "codeRef.cooldownMs": {
           "type": "number",
           "default": 1000,
           "description": "Minimum milliseconds between two sounds"
         },
-        "soundIvory.triggerOn": {
+        "codeRef.triggerOn": {
           "type": "array",
           "items": { "type": "string" },
           "default": ["error"],
