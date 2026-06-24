@@ -1,0 +1,73 @@
+{
+  "name": "sound-ivory",
+  "displayName": "Sound Ivory",
+  "description": "Plays a random sound when a new bug appears in your code",
+  "version": "0.1.0",
+  "publisher": "sound-ivory",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "keywords": ["sound", "bug", "diagnostic", "fun"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "soundIvory.manageSounds",
+        "title": "Sound Ivory: Manage Sounds"
+      },
+      {
+        "command": "soundIvory.toggle",
+        "title": "Sound Ivory: Toggle On/Off"
+      }
+    ],
+    "configuration": {
+      "title": "Sound Ivory",
+      "properties": {
+        "soundIvory.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable sound alerts"
+        },
+        "soundIvory.volume": {
+          "type": "number",
+          "default": 0.8,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Playback volume (0.0 to 1.0)"
+        },
+        "soundIvory.cooldownMs": {
+          "type": "number",
+          "default": 1000,
+          "description": "Minimum milliseconds between two sounds"
+        },
+        "soundIvory.triggerOn": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["error"],
+          "description": "Severity levels that trigger a sound: error, warning, info"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify",
+    "dev": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
+    "compile": "tsc --noEmit",
+    "lint": "eslint src",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.24.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "play-sound": "^1.1.5"
+  }
+}
