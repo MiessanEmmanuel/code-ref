@@ -1,0 +1,52 @@
+name: 🎵 Sound Submission
+description: Submit a sound to the Sound Ivory community library
+title: "[Sound] <your sound name here>"
+labels: ["sound-submission", "pending-review"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Sound name
+      description: A short, descriptive name for your sound
+      placeholder: "e.g. Classic Error Beep"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What does this sound convey? When does it fit best?
+      placeholder: "A classic retro beep, perfect for syntax errors"
+    validations:
+      required: false
+
+  - type: input
+    id: tags
+    attributes:
+      label: Tags
+      description: Comma-separated tags to help users find it
+      placeholder: "retro, beep, funny, dramatic"
+    validations:
+      required: false
+
+  - type: textarea
+    id: file
+    attributes:
+      label: Sound file
+      description: |
+        Attach your sound file here (MP3 or WAV, max 17 seconds, max 2MB).
+        You can also attach a short video clip — it will be converted automatically.
+        **Drag and drop the file into this text box.**
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: rights
+    attributes:
+      label: Rights & License
+      options:
+        - label: I confirm I own the rights to this sound or it is royalty-free / Creative Commons
+          required: true
+        - label: I agree for this sound to be distributed freely as part of the Sound Ivory extension
+          required: true
