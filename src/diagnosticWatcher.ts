@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import { SoundPlayer } from "./soundPlayer";
 
+
+
 export class DiagnosticWatcher {
   private disposable: vscode.Disposable;
   private previousErrorUris = new Map<string, number>();

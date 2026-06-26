@@ -23,7 +23,7 @@ export class AdminPanel {
       this.panel.webview.postMessage({ command: "switchTab", tab });
       return;
     }
-
+   /* TODO: JE DOIS REPRENDRE  */
     this.panel = vscode.window.createWebviewPanel(
       "codeRefAdmin",
       "Code Ref",

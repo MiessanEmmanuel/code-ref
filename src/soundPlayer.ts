@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { execFile } from "child_process";
+import { execFile, ChildProcess } from "child_process";
 
 const VIDEO_EXTENSIONS = /\.(mp4|mov|avi|mkv|webm|m4v|flv|wmv)$/i;
 const MAX_DURATION_SECONDS = 17;
@@ -9,6 +9,7 @@ export class SoundPlayer {
   private soundsDir: string;
   private communityDir: string;
   private lastPlayedAt = 0;
+  private currentProcess: ChildProcess | undefined;
 
   constructor(soundsDir: string) {
     this.soundsDir = soundsDir;
@@ -49,13 +50,16 @@ export class SoundPlayer {
   }
 
   playFile(filePath: string, volume: number): void {
+    this.stopCurrent();
+
     const platform = process.platform;
 
     if (platform === "darwin") {
-      execFile("afplay", ["-v", String(volume), filePath], () => {});
+      this.currentProcess = execFile("afplay", ["-v", String(volume), filePath], () => {
+        this.currentProcess = undefined;
+      });
     } else if (platform === "win32") {
-      // Pass path as a separate argument to avoid PowerShell injection
-      execFile(
+      this.currentProcess = execFile(
         "powershell",
         [
           "-NoProfile",
@@ -66,12 +70,25 @@ export class SoundPlayer {
           "--",
           filePath,
         ],
-        () => {}
+        () => { this.currentProcess = undefined; }
       );
     } else {
-      execFile("paplay", [filePath], (err) => {
-        if (err) execFile("aplay", [filePath], () => {});
+      this.currentProcess = execFile("paplay", [filePath], (err) => {
+        if (err) {
+          this.currentProcess = execFile("aplay", [filePath], () => {
+            this.currentProcess = undefined;
+          });
+        } else {
+          this.currentProcess = undefined;
+        }
       });
+    }
+  }
+
+  private stopCurrent(): void {
+    if (this.currentProcess) {
+      this.currentProcess.kill();
+      this.currentProcess = undefined;
     }
   }
 
