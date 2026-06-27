@@ -5,6 +5,20 @@ import { execFile, ChildProcess } from "child_process";
 const VIDEO_EXTENSIONS = /\.(mp4|mov|avi|mkv|webm|m4v|flv|wmv)$/i;
 const MAX_DURATION_SECONDS = 17;
 
+const FFMPEG_PATHS =
+  process.platform === "win32"
+    ? ["C:\\ffmpeg\\bin\\ffmpeg.exe", "ffmpeg"]
+    : ["/usr/local/bin/ffmpeg", "/opt/homebrew/bin/ffmpeg", "/usr/bin/ffmpeg", "ffmpeg"];
+
+function findFfmpeg(): string {
+  for (const p of FFMPEG_PATHS) {
+    try {
+      if (p === "ffmpeg" || require("fs").existsSync(p)) return p;
+    } catch {}
+  }
+  return "ffmpeg";
+}
+
 export class SoundPlayer {
   private soundsDir: string;
   private communityDir: string;
@@ -99,7 +113,13 @@ export class SoundPlayer {
     }
     const fileName = path.basename(sourcePath);
     const dest = path.join(this.soundsDir, fileName);
-    fs.copyFileSync(sourcePath, dest);
+    try {
+      fs.copyFileSync(sourcePath, dest);
+    } catch {
+      return Promise.reject(
+        new Error(`Cannot access this file. Move it to your Desktop or Downloads folder first, then try again.`)
+      );
+    }
     return Promise.resolve(fileName);
   }
 
@@ -124,7 +144,7 @@ export class SoundPlayer {
 
     return new Promise((resolve, reject) => {
       execFile(
-        "ffmpeg",
+        findFfmpeg(),
         [
           "-y",
           "-i", tmpPath,
@@ -135,6 +155,7 @@ export class SoundPlayer {
           "-b:a", "192k",
           outputPath,
         ],
+        { maxBuffer: 10 * 1024 * 1024 },
         (err, stdout, stderr) => {
           try { fs.unlinkSync(tmpPath); } catch {}
           if (err) {

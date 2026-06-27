@@ -2,7 +2,7 @@
   "name": "code-ref",
   "displayName": "Code Ref",
   "description": "Plays a random sound when a new bug appears in your code",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "opencode0",
   "engines": {
     "vscode": "^1.85.0"
