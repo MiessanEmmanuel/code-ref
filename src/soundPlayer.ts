@@ -104,26 +104,42 @@ export class SoundPlayer {
   }
 
   private convertVideoToAudio(sourcePath: string): Promise<string> {
+    if (!fs.existsSync(sourcePath)) {
+      return Promise.reject(new Error(`File not found: ${sourcePath}`));
+    }
+
     const baseName = path.basename(sourcePath, path.extname(sourcePath));
+    const ext = path.extname(sourcePath);
     const outputName = `${baseName}.mp3`;
     const outputPath = path.join(this.soundsDir, outputName);
+
+    // Copy to a temp dir first — files from AirDrop/sandboxed apps are not
+    // directly accessible to child processes like ffmpeg
+    const tmpPath = path.join(this.soundsDir, `_tmp_${Date.now()}${ext}`);
+    try {
+      fs.copyFileSync(sourcePath, tmpPath);
+    } catch {
+      return Promise.reject(new Error(`Cannot read file — try moving it to your Desktop first, then re-add it.`));
+    }
 
     return new Promise((resolve, reject) => {
       execFile(
         "ffmpeg",
         [
           "-y",
-          "-i", sourcePath,
+          "-i", tmpPath,
           "-t", String(MAX_DURATION_SECONDS),
-          "-vn",              // no video
-          "-ar", "44100",     // sample rate
-          "-ac", "2",         // stereo
+          "-vn",
+          "-ar", "44100",
+          "-ac", "2",
           "-b:a", "192k",
           outputPath,
         ],
-        (err, _stdout, stderr) => {
+        (err, stdout, stderr) => {
+          try { fs.unlinkSync(tmpPath); } catch {}
           if (err) {
-            reject(new Error(`ffmpeg failed: ${stderr}`));
+            const detail = (stderr || stdout || err.message || "unknown error").trim();
+            reject(new Error(`ffmpeg failed: ${detail}`));
           } else {
             resolve(outputName);
           }

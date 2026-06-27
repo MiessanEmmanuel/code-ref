@@ -1,7 +1,14 @@
 src/
 node_modules/
 .vscode/
+.github/
+.claude/
 tsconfig.json
 esbuild*
 .eslintrc*
 **/*.map
+**/*.vsix
+community/sounds/**
+community/**/*.mp4
+community/**/*.mp3
+community/**/*.wav
