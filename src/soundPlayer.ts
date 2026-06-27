@@ -52,7 +52,11 @@ export class SoundPlayer {
 
   play(volume: number, cooldownMs: number): void {
     const now = Date.now();
-    if (now - this.lastPlayedAt < cooldownMs) return;
+    const isPlaying = this.currentProcess !== undefined;
+
+    // If something is already playing, stop it and play the new one immediately.
+    // If nothing is playing, apply the cooldown to avoid rapid-fire on save.
+    if (!isPlaying && now - this.lastPlayedAt < cooldownMs) return;
 
     const all = this.getAllPlayablePaths();
     if (all.length === 0) return;
