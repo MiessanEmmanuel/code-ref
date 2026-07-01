@@ -73,20 +73,19 @@ export class SoundPlayer {
     const platform = process.platform;
 
     if (platform === "darwin") {
-      this.currentProcess = execFile("afplay", ["-v", String(volume), filePath], () => {
-        this.currentProcess = undefined;
-      });
+      this.currentProcess = execFile(
+        "/usr/bin/afplay",
+        ["-v", String(volume), filePath],
+        () => { this.currentProcess = undefined; }
+      );
     } else if (platform === "win32") {
       this.currentProcess = execFile(
         "powershell",
         [
-          "-NoProfile",
-          "-NonInteractive",
-          "-Command",
+          "-NoProfile", "-NonInteractive", "-Command",
           "[System.Reflection.Assembly]::LoadWithPartialName('System.Media') | Out-Null; " +
           "$p = New-Object System.Media.SoundPlayer($args[0]); $p.PlaySync()",
-          "--",
-          filePath,
+          "--", filePath,
         ],
         () => { this.currentProcess = undefined; }
       );
@@ -105,8 +104,15 @@ export class SoundPlayer {
 
   private stopCurrent(): void {
     if (this.currentProcess) {
-      this.currentProcess.kill();
+      const proc = this.currentProcess;
       this.currentProcess = undefined;
+      try {
+        proc.kill("SIGKILL");
+      } catch {}
+    }
+    // Belt-and-suspenders: kill any lingering afplay on macOS
+    if (process.platform === "darwin") {
+      execFile("/usr/bin/pkill", ["-x", "afplay"], () => {});
     }
   }
 
