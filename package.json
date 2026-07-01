@@ -21,6 +21,10 @@
       {
         "command": "codeRef.toggle",
         "title": "Code Ref: Toggle On/Off"
+      },
+      {
+        "command": "codeRef.stop",
+        "title": "Code Ref: Stop Sound"
       }
     ],
     "configuration": {

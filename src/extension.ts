@@ -10,9 +10,32 @@ export function activate(context: vscode.ExtensionContext): void {
   const watcher = new DiagnosticWatcher(player);
   const admin = new AdminPanel(context, player);
 
+  // Status bar item: appears only while a sound is playing, click to stop.
+  const stopItem = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Right,
+    100
+  );
+  stopItem.text = "$(debug-stop) Stop sound";
+  stopItem.tooltip = "Code Ref: stop the current sound";
+  stopItem.command = "codeRef.stop";
+
+  player.onStateChange((state) => {
+    if (state.playing) {
+      stopItem.show();
+    } else {
+      stopItem.hide();
+    }
+  });
+
   context.subscriptions.push(
+    stopItem,
+
     vscode.commands.registerCommand("codeRef.manageSounds", () => {
       admin.show();
+    }),
+
+    vscode.commands.registerCommand("codeRef.stop", () => {
+      player.stop();
     }),
 
     vscode.commands.registerCommand("codeRef.toggle", () => {

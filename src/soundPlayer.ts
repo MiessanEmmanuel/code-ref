@@ -25,6 +25,8 @@ export class SoundPlayer {
   private lastPlayedAt = 0;
   private currentProcess: ChildProcess | undefined;
   private isPlaying = false;
+  private playingFile: string | undefined;
+  private stateListeners: Array<(state: { playing: boolean; file?: string }) => void> = [];
 
   constructor(soundsDir: string) {
     this.soundsDir = soundsDir;
@@ -32,6 +34,25 @@ export class SoundPlayer {
     if (!fs.existsSync(soundsDir)) {
       fs.mkdirSync(soundsDir, { recursive: true });
     }
+  }
+
+  onStateChange(cb: (state: { playing: boolean; file?: string }) => void): void {
+    this.stateListeners.push(cb);
+  }
+
+  private emitState(): void {
+    const state = { playing: this.isPlaying, file: this.playingFile };
+    for (const cb of this.stateListeners) {
+      try { cb(state); } catch {}
+    }
+  }
+
+  isCurrentlyPlaying(): boolean {
+    return this.isPlaying;
+  }
+
+  currentFile(): string | undefined {
+    return this.playingFile;
   }
 
   getSounds(): string[] {
@@ -68,13 +89,27 @@ export class SoundPlayer {
     this.playFile(filePath, volume);
   }
 
+  // Deliberate playback (e.g. Preview button): always interrupts the current
+  // sound and plays the new one.
+  preview(filePath: string, volume: number): void {
+    this.stop();
+    this.playFile(filePath, volume);
+  }
+
   playFile(filePath: string, volume: number): void {
     // Mark as playing synchronously so concurrent triggers are ignored.
     this.isPlaying = true;
+    this.playingFile = path.basename(filePath);
+    this.emitState();
 
+    let finished = false;
     const done = () => {
+      if (finished) return;
+      finished = true;
       this.isPlaying = false;
+      this.playingFile = undefined;
       this.currentProcess = undefined;
+      this.emitState();
     };
 
     const platform = process.platform;
@@ -105,6 +140,17 @@ export class SoundPlayer {
         }
       });
     }
+  }
+
+  stop(): void {
+    const proc = this.currentProcess;
+    this.currentProcess = undefined;
+    this.isPlaying = false;
+    this.playingFile = undefined;
+    if (proc) {
+      try { proc.kill("SIGKILL"); } catch {}
+    }
+    this.emitState();
   }
 
   addSound(sourcePath: string): Promise<string> {

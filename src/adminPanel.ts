@@ -15,6 +15,15 @@ export class AdminPanel {
     private player: SoundPlayer
   ) {
     this.fetcher = new CommunityFetcher(context.globalStorageUri.fsPath);
+
+    // Reflect playback state in the webview so Preview buttons can toggle.
+    this.player.onStateChange((state) => {
+      this.panel?.webview.postMessage({
+        command: "playState",
+        playing: state.playing,
+        file: state.file ?? null,
+      });
+    });
   }
 
   show(tab: "my" | "community" = "my"): void {
@@ -74,11 +83,20 @@ export class AdminPanel {
           break;
 
         case "previewMySound": {
+          // Toggle: clicking the sound that's already playing stops it.
+          if (this.player.isCurrentlyPlaying() && this.player.currentFile() === msg.fileName) {
+            this.player.stop();
+            break;
+          }
           const config = vscode.workspace.getConfiguration("codeRef");
           const filePath = path.join(this.context.globalStorageUri.fsPath, "sounds", msg.fileName);
-          this.player.playFile(filePath, config.get<number>("volume", 0.8));
+          this.player.preview(filePath, config.get<number>("volume", 0.8));
           break;
         }
+
+        case "stopSound":
+          this.player.stop();
+          break;
 
         case "fetchCommunity":
           this.loadCommunityTab();
@@ -105,9 +123,13 @@ export class AdminPanel {
           break;
 
         case "previewCommunitySound": {
+          if (this.player.isCurrentlyPlaying() && this.player.currentFile() === msg.fileName) {
+            this.player.stop();
+            break;
+          }
           const config = vscode.workspace.getConfiguration("codeRef");
           const filePath = path.join(this.context.globalStorageUri.fsPath, "community", msg.fileName);
-          this.player.playFile(filePath, config.get<number>("volume", 0.8));
+          this.player.preview(filePath, config.get<number>("volume", 0.8));
           break;
         }
 
@@ -179,6 +201,18 @@ export class AdminPanel {
   button.secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
   button.danger { background: transparent; color: var(--vscode-errorForeground); border: 1px solid var(--vscode-errorForeground); }
   button.small { padding: 3px 10px; font-size: 0.8rem; }
+  button.playing { background: var(--vscode-errorForeground); color: #fff; font-weight: 600; }
+  button.playing:hover { opacity: 0.85; }
+
+  .now-playing { display: none; align-items: center; gap: 10px; margin: 12px 0 0; padding: 8px 12px; background: var(--vscode-inputValidation-infoBackground, var(--vscode-textBlockQuote-background)); border-radius: 4px; font-size: 0.85rem; }
+  .now-playing.visible { display: flex; }
+  .now-playing .label { flex: 1; }
+  .now-playing .bars { display: inline-flex; gap: 2px; align-items: flex-end; height: 14px; }
+  .now-playing .bars span { width: 3px; background: var(--vscode-errorForeground); animation: eq 0.8s ease-in-out infinite; }
+  .now-playing .bars span:nth-child(1){ height: 6px; animation-delay: 0s; }
+  .now-playing .bars span:nth-child(2){ height: 12px; animation-delay: 0.15s; }
+  .now-playing .bars span:nth-child(3){ height: 8px; animation-delay: 0.3s; }
+  @keyframes eq { 0%,100%{ transform: scaleY(0.5);} 50%{ transform: scaleY(1);} }
 
   table { width: 100%; border-collapse: collapse; }
   th { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--vscode-widget-border); color: var(--vscode-descriptionForeground); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -207,6 +241,11 @@ export class AdminPanel {
   <div class="tabs">
     <button class="tab ${activeTab === "my" ? "active" : ""}" onclick="switchTab('my')">My Sounds</button>
     <button class="tab ${activeTab === "community" ? "active" : ""}" onclick="switchTab('community')">Community</button>
+  </div>
+  <div id="now-playing" class="now-playing">
+    <span class="bars"><span></span><span></span><span></span></span>
+    <span class="label" id="now-playing-label">Playing…</span>
+    <button class="danger small" onclick="send('stopSound')">⏹ Stop</button>
   </div>
 </header>
 
@@ -244,6 +283,12 @@ export class AdminPanel {
   const vscode = acquireVsCodeApi();
   function send(command, extra) { vscode.postMessage({ command, ...extra }); }
 
+  // Playback state, kept in sync via 'playState' messages from the extension.
+  let playingFile = null;
+  let mySoundsData = [];
+  let communityData = null;
+  let communityDownloaded = [];
+
   function switchTab(tab) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
@@ -253,23 +298,32 @@ export class AdminPanel {
   }
 
   function renderMySounds(sounds) {
+    mySoundsData = sounds;
     const tbody = document.getElementById('my-tbody');
     document.getElementById('my-count').textContent = sounds.length + ' sound' + (sounds.length !== 1 ? 's' : '');
     if (!sounds.length) {
       tbody.innerHTML = '<tr><td colspan="2" class="empty">No sounds yet. Click "Add Sounds / Videos" to get started.</td></tr>';
       return;
     }
-    tbody.innerHTML = sounds.map(s => \`
+    tbody.innerHTML = sounds.map(s => {
+      const isThis = playingFile === s;
+      const btn = isThis
+        ? \`<button class="small playing" onclick="send('previewMySound',{fileName:'\${esc(s)}'})">⏹ Stop</button>\`
+        : \`<button class="small" onclick="send('previewMySound',{fileName:'\${esc(s)}'})">▶ Preview</button>\`;
+      return \`
       <tr>
         <td class="name">\${esc(s)}</td>
         <td class="actions">
-          <button class="small" onclick="send('previewMySound',{fileName:'\${esc(s)}'})">▶ Preview</button>
+          \${btn}
           <button class="small danger" onclick="send('removeSound',{fileName:'\${esc(s)}'})">✕</button>
         </td>
-      </tr>\`).join('');
+      </tr>\`;
+    }).join('');
   }
 
   function renderCommunity(sounds, downloaded) {
+    communityData = sounds;
+    communityDownloaded = downloaded;
     const tbody = document.getElementById('community-tbody');
     const dl = new Set(downloaded);
     document.getElementById('community-status').textContent = sounds.length + ' sound' + (sounds.length !== 1 ? 's' : '') + ' available';
@@ -279,10 +333,14 @@ export class AdminPanel {
     }
     tbody.innerHTML = sounds.map(s => {
       const isDown = dl.has(s.file);
+      const isThis = playingFile === s.file;
+      const previewBtn = isThis
+        ? \`<button class="small playing" onclick="send('previewCommunitySound',{fileName:'\${esc(s.file)}'})">⏹</button>\`
+        : \`<button class="small" onclick="send('previewCommunitySound',{fileName:'\${esc(s.file)}'})">▶</button>\`;
       const tags = (s.tags||[]).map(t => \`<span class="tag">\${esc(t)}</span>\`).join('');
       const actions = isDown
         ? \`<span class="badge-downloaded">✓ In library</span>
-           <button class="small" onclick="send('previewCommunitySound',{fileName:'\${esc(s.file)}'})">▶</button>
+           \${previewBtn}
            <button class="small danger" onclick="send('removeCommunitySound',{fileName:'\${esc(s.file)}'})">✕</button>\`
         : \`<button class="small" onclick='send("downloadCommunitySound",{sound:\${JSON.stringify(s)}})'>⬇ Add</button>\`;
       return \`<tr>
@@ -296,6 +354,23 @@ export class AdminPanel {
 
   function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  function applyPlayState(playing, file) {
+    playingFile = playing ? file : null;
+
+    const np = document.getElementById('now-playing');
+    const label = document.getElementById('now-playing-label');
+    if (playingFile) {
+      np.classList.add('visible');
+      label.textContent = 'Playing: ' + playingFile;
+    } else {
+      np.classList.remove('visible');
+    }
+
+    // Re-render lists so Preview/Stop buttons reflect the new state.
+    if (mySoundsData.length) renderMySounds(mySoundsData);
+    if (communityData) renderCommunity(communityData, communityDownloaded);
   }
 
   window.addEventListener('message', e => {
@@ -312,6 +387,7 @@ export class AdminPanel {
         document.getElementById('community-status').textContent = 'Error: ' + msg.message;
         break;
       case 'switchTab': switchTab(msg.tab); break;
+      case 'playState': applyPlayState(msg.playing, msg.file); break;
     }
   });
 
