@@ -24,6 +24,7 @@ export class SoundPlayer {
   private communityDir: string;
   private lastPlayedAt = 0;
   private currentProcess: ChildProcess | undefined;
+  private isPlaying = false;
 
   constructor(soundsDir: string) {
     this.soundsDir = soundsDir;
@@ -51,12 +52,12 @@ export class SoundPlayer {
   }
 
   play(volume: number, cooldownMs: number): void {
-    const now = Date.now();
-    const isPlaying = this.currentProcess !== undefined;
+    // If a sound is already playing, ignore this trigger entirely:
+    // the current sound keeps playing and no new sound starts.
+    if (this.isPlaying) return;
 
-    // If something is already playing, stop it and play the new one immediately.
-    // If nothing is playing, apply the cooldown to avoid rapid-fire on save.
-    if (!isPlaying && now - this.lastPlayedAt < cooldownMs) return;
+    const now = Date.now();
+    if (now - this.lastPlayedAt < cooldownMs) return;
 
     const all = this.getAllPlayablePaths();
     if (all.length === 0) return;
@@ -68,7 +69,13 @@ export class SoundPlayer {
   }
 
   playFile(filePath: string, volume: number): void {
-    this.stopCurrent();
+    // Mark as playing synchronously so concurrent triggers are ignored.
+    this.isPlaying = true;
+
+    const done = () => {
+      this.isPlaying = false;
+      this.currentProcess = undefined;
+    };
 
     const platform = process.platform;
 
@@ -76,7 +83,7 @@ export class SoundPlayer {
       this.currentProcess = execFile(
         "/usr/bin/afplay",
         ["-v", String(volume), filePath],
-        () => { this.currentProcess = undefined; }
+        done
       );
     } else if (platform === "win32") {
       this.currentProcess = execFile(
@@ -87,26 +94,16 @@ export class SoundPlayer {
           "$p = New-Object System.Media.SoundPlayer($args[0]); $p.PlaySync()",
           "--", filePath,
         ],
-        () => { this.currentProcess = undefined; }
+        done
       );
     } else {
       this.currentProcess = execFile("paplay", [filePath], (err) => {
         if (err) {
-          this.currentProcess = execFile("aplay", [filePath], () => {
-            this.currentProcess = undefined;
-          });
+          this.currentProcess = execFile("aplay", [filePath], done);
         } else {
-          this.currentProcess = undefined;
+          done();
         }
       });
-    }
-  }
-
-  private stopCurrent(): void {
-    if (this.currentProcess) {
-      const proc = this.currentProcess;
-      this.currentProcess = undefined;
-      try { proc.kill("SIGKILL"); } catch {}
     }
   }
 
