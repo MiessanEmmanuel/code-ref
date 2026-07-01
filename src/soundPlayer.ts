@@ -106,13 +106,7 @@ export class SoundPlayer {
     if (this.currentProcess) {
       const proc = this.currentProcess;
       this.currentProcess = undefined;
-      try {
-        proc.kill("SIGKILL");
-      } catch {}
-    }
-    // Belt-and-suspenders: kill any lingering afplay on macOS
-    if (process.platform === "darwin") {
-      execFile("/usr/bin/pkill", ["-x", "afplay"], () => {});
+      try { proc.kill("SIGKILL"); } catch {}
     }
   }
 
